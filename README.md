@@ -11,6 +11,25 @@ A powerful local tool for analyzing Git repositories from Azure DevOps, GitHub, 
 - **Developer Profiles**: detailed activity tracking for individual contributors.
 - **Export Capabilities**: Export data for external reporting.
 
+## Git Operations & Security
+
+This application is strictly **Read-Only**. It does not execute local `git` commands (like `commit`, `push`, `merge`) and interacts with repositories exclusively via the providers' REST APIs to fetch data. It will never modify your source code or repository history.
+
+### Verified API Operations
+The application uses the following read-only API endpoints:
+- **Azure DevOps**:
+  - `GET _apis/git/repositories` (List Repos)
+  - `GET _apis/git/repositories/{repo}/commits` (Fetch History)
+  - `GET _apis/git/repositories/{repo}/commits/{sha}/changes` (Analyze Changes)
+  - `GET _apis/git/repositories/{repo}/diffs` (View Diffs)
+- **GitHub**:
+  - `GET /repos/{owner}/{repo}` (Repo Details)
+  - `GET /repos/{owner}/{repo}/commits` (Fetch History)
+  - `GET /repos/{owner}/{repo}/commits/{sha}` (Commit Details)
+- **GitLab**:
+  - `GET /projects/{id}/repository/commits` (Fetch History)
+  - `GET /projects/{id}/repository/commits/{sha}/diff` (View Diffs)
+
 ## Getting Started
 
 ### macOS

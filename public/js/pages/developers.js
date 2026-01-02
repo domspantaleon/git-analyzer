@@ -105,9 +105,7 @@ const DevelopersPage = {
                             <button class="btn btn-sm btn-secondary" onclick="DevelopersPage.showDetails(${val})">
                                 Details
                             </button>
-                            <button class="btn btn-sm btn-secondary" onclick="DevelopersPage.showMergeModal(${val})">
-                                Merge
-                            </button>
+                           
                         `
                     }
                 ],
@@ -222,7 +220,11 @@ const DevelopersPage = {
                 </div>
             `;
 
-            Modal.open(dev?.canonical_name || 'Developer Details', content, { fullScreen: true });
+            Modal.open(dev?.canonical_name || 'Developer Details', content, {
+                fullScreen: false,
+                allowExpand: true,
+                maxWidth: '1200px' // Give it a good default width since we have columns
+            });
 
             // Load activity immediately
             this.loadDeveloperActivity(developerId);
@@ -291,7 +293,7 @@ const DevelopersPage = {
                     <thead>
                         <tr class="text-xs text-muted uppercase border-b border-gray-700 bg-gray-900">
                             <th class="p-3 w-24">Time</th>
-                            <th class="p-3">Message</th>
+                            <th class="p-3" style="width: 500px; min-width: 500px;">Message</th>
                             <th class="p-3 w-48">Repo/Branch</th>
                             <th class="p-3 w-24 text-right">Added</th>
                             <th class="p-3 w-24 text-right">Removed</th>
@@ -323,7 +325,10 @@ const DevelopersPage = {
                         onclick="DevelopersPage.toggleCommitFiles(${commit.id}, this)">
                         <td class="p-3 text-muted font-mono text-xs whitespace-nowrap">${time}</td>
                         <td class="p-3">
-                            <div class="font-medium text-blue-400 truncate max-w-md" title="${commit.message}">${firstLine}</div>
+                            <div class="font-medium text-blue-400" style="white-space: normal;" title="${commit.message}">
+                                ${firstLine}
+                                <span class="px-2 py-0.5 ml-2 text-xs rounded bg-gray-700 text-gray-300 font-mono inline-block border border-gray-600">${commit.sha.substring(0, 7)}</span>
+                            </div>
                         </td>
                         <td class="p-3 text-xs text-muted">
                             <div class="truncate max-w-[180px]" title="${commit.repo_name}">${commit.repo_name}</div>
@@ -470,6 +475,9 @@ const DevelopersPage = {
         // Clean URL (remove trailing slash)
         let baseUrl = platformUrl.replace(/\/$/, '');
 
+        // Remove credentials/username from URL (e.g. https://user@dev.azure.com -> https://dev.azure.com)
+        baseUrl = baseUrl.replace(/:\/\/[^@\/]+@/, '://');
+
         // Handle Azure DevOps
         if (platformType === 'azure_devops') {
             // Fix: Strip existing /_git/ from config URL to prevent doubling
@@ -489,20 +497,26 @@ const DevelopersPage = {
                 repo = repoFullName;
             }
 
-            // If baseUrl already includes the project name (common mistake or just how it is)
-            // e.g. https://dev.azure.com/Org/Project
+            // If baseUrl already includes the project name, strip it to avoid duplication
+            // We want base to be https://dev.azure.com/Org
             if (baseUrl.toLowerCase().endsWith(`/${project.toLowerCase()}`)) {
                 baseUrl = baseUrl.substring(0, baseUrl.length - project.length - 1);
             }
 
+            // Encode components to be safe
+            const encProject = encodeURIComponent(project);
+            const encRepo = encodeURIComponent(repo);
+
+            let url = `${baseUrl}/${encProject}/_git/${encRepo}/commit/${sha}`;
+
             if (filename) {
                 const path = filename.startsWith('/') ? filename : '/' + filename;
-                // Use encodeURI to handle spaces/special chars but keep slashes
+                // Use encodeURI for path to preserve slashes but encode spaces/etc
                 const encodedPath = encodeURI(path);
-                return `${baseUrl}/${project}/_git/${repo}/commit/${sha}?path=${encodedPath}`;
-            } else {
-                return `${baseUrl}/${project}/_git/${repo}/commit/${sha}`;
+                url += `?path=${encodedPath}`;
             }
+
+            return url;
         }
 
         // Handle GitHub

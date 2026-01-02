@@ -29,6 +29,35 @@ const App = {
      * Initialize default date range (last 7 days)
      */
     initDateRange() {
+        // Try to load from localStorage
+        const saved = localStorage.getItem('git_analyzer_date_range');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                // Validate parsed data structure roughly
+                if (parsed.from && parsed.to && parsed.preset) {
+                    this.dateRange = parsed;
+
+                    // Update inputs
+                    document.getElementById('date-from').value = this.dateRange.from;
+                    document.getElementById('date-to').value = this.dateRange.to;
+
+                    // Update text display 
+                    // (We need to do this here because we might not call setDatePreset if loading custom)
+                    // But we can't call updateDateRangeText yet because DOM might not be fully ready? 
+                    // actually initDateRange is called in init() so it should be fine.
+                    // We'll defer text update to after initDatePicker or just call it here if element exists.
+                    // Let's rely on standard flow or just let the default flow proceed if no saved.
+                    return;
+                }
+            } catch (e) {
+                console.warn('Failed to parse saved date range', e);
+            }
+        }
+
+        // Default: Last 30 days (User requested logic, or stick to 7 days default but persist if changed? 
+        // User asked "if I select last 30 Days it should stay". So default can remain 7 days, 
+        // but we just need to persist selection.)
         const today = new Date();
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
@@ -92,11 +121,27 @@ const App = {
                 this.dateRange.from = from;
                 this.dateRange.to = to;
                 this.dateRange.preset = 'custom';
+
+                // Save to localStorage
+                localStorage.setItem('git_analyzer_date_range', JSON.stringify(this.dateRange));
+
                 this.updateDateRangeText();
                 dropdown.classList.remove('open');
                 this.refreshCurrentPage();
             }
         });
+
+        // Correctly highlight the active preset button if we loaded one
+        if (this.dateRange.preset && this.dateRange.preset !== 'custom') {
+            const activeBtn = document.querySelector(`.date-presets button[data-preset="${this.dateRange.preset}"]`);
+            if (activeBtn) {
+                document.querySelectorAll('.date-presets button').forEach(b => b.classList.remove('active'));
+                activeBtn.classList.add('active');
+            }
+        }
+
+        // Update the text display initially based on loaded range
+        this.updateDateRangeText();
     },
 
     /**
@@ -131,6 +176,9 @@ const App = {
         this.dateRange.from = this.formatDate(from);
         this.dateRange.to = this.formatDate(today);
         this.dateRange.preset = preset;
+
+        // Save to localStorage
+        localStorage.setItem('git_analyzer_date_range', JSON.stringify(this.dateRange));
 
         document.getElementById('date-from').value = this.dateRange.from;
         document.getElementById('date-to').value = this.dateRange.to;

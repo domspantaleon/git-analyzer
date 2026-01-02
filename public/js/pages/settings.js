@@ -303,35 +303,32 @@ const SettingsPage = {
         const statusEl = document.getElementById('ollama-status');
         statusEl.innerHTML = '<span class="text-muted">Testing...</span>';
 
-        const endpoint = document.getElementById('ollama-endpoint').value;
-
         try {
-            const response = await fetch(`${endpoint}/api/tags`, {
-                method: 'GET',
-                signal: AbortSignal.timeout(5000)
-            });
+            // First save the current settings to ensure backend tests with new values
+            await this.saveOllama(true); // silent save
 
-            if (response.ok) {
-                const data = await response.json();
-                const models = data.models?.map(m => m.name).join(', ') || 'No models found';
-                statusEl.innerHTML = `<span class="text-success">✓ Connected. Models: ${models}</span>`;
+            const result = await API.ollama.test();
+
+            if (result.success) {
+                statusEl.innerHTML = `<span class="text-success">✓ ${result.message}</span>`;
             } else {
-                statusEl.innerHTML = `<span class="text-danger">✗ Failed: HTTP ${response.status}</span>`;
+                statusEl.innerHTML = `<span class="text-danger">✗ ${result.message || 'Connection failed'}</span>`;
             }
         } catch (error) {
             statusEl.innerHTML = `<span class="text-danger">✗ ${error.message}</span>`;
         }
     },
 
-    async saveOllama() {
+    async saveOllama(silent = false) {
         try {
             await API.settings.update({
                 ollama_endpoint: document.getElementById('ollama-endpoint').value,
                 ollama_model: document.getElementById('ollama-model').value
             });
-            Toast.show('Ollama settings saved', 'success');
+            if (!silent) Toast.show('Ollama settings saved', 'success');
         } catch (error) {
-            Toast.show(`Failed: ${error.message}`, 'error');
+            if (!silent) Toast.show(`Failed: ${error.message}`, 'error');
+            throw error;
         }
     },
 
@@ -355,7 +352,37 @@ const SettingsPage = {
         );
 
         if (confirmed) {
-            Toast.show('Clear data functionality requires server restart', 'warning');
+            try {
+                // Show loading state on button
+                const btn = document.getElementById('clear-data-btn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Clearing...';
+                btn.disabled = true;
+
+                await API.settings.clearData();
+
+                Toast.show('All data cleared successfully', 'success');
+
+                // Reset internal state if needed (though reload handles it)
+                if (window.App) {
+                    window.App.repositories = [];
+                    // ... other state resets if App holds big state
+                }
+
+                // Reload the page to reset all stores/caches in frontend
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+
+            } catch (error) {
+                Toast.show(`Failed to clear data: ${error.message}`, 'error');
+                // Restore button
+                const btn = document.getElementById('clear-data-btn');
+                if (btn) {
+                    btn.textContent = 'Clear All Data';
+                    btn.disabled = false;
+                }
+            }
         }
     }
 };

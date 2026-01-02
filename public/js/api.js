@@ -87,7 +87,8 @@ const API = {
     // Settings
     settings: {
         get: () => API.request('/settings'),
-        update: (settings) => API.request('/settings', { method: 'PUT', body: settings })
+        update: (settings) => API.request('/settings', { method: 'PUT', body: settings }),
+        clearData: () => API.request('/settings/clear-data', { method: 'POST' })
     },
 
     // Platforms
@@ -264,12 +265,7 @@ const API = {
 
     // Ollama
     ollama: {
-        test: () => API.request('/settings').then(settings => {
-            // Test via settings update trigger
-            return fetch(`${settings.ollama_endpoint || 'http://localhost:11434'}/api/tags`)
-                .then(r => r.ok ? { success: true } : { success: false })
-                .catch(() => ({ success: false }));
-        })
+        test: () => API.request('/settings/test-ollama', { method: 'POST' })
     }
 };
 

@@ -5,6 +5,7 @@ const GitLabClient = require('./gitlab');
 const { isFileExcluded } = require('../utils/file-exclusions');
 const { processIdentities } = require('./developer-grouping');
 const { analyzeCommit, saveCommitFlags } = require('./analysis');
+const logger = require('../utils/logger'); // Import logger
 
 /**
  * Sync orchestration service
@@ -91,17 +92,21 @@ async function syncRepositories(progressCallback = null) {
                     `, [platform.id, repo.id, repo.name, repo.fullName, repo.defaultBranch]);
 
                     results.success++;
+                    logger.debug(`Synced repository: ${repo.full_name}`);
                 } catch (error) {
                     results.failed++;
                     results.errors.push(`Repo ${repo.name}: ${error.message}`);
+                    logger.error(`Failed to sync repo ${repo.name}:`, error);
                 }
                 results.total++;
             }
         } catch (error) {
             results.errors.push(`Platform ${platform.name}: ${error.message}`);
+            logger.error(`Platform sync failed for ${platform.name}:`, error);
         }
     });
 
+    logger.info('Repository sync completed', results);
     return results;
 }
 
@@ -149,14 +154,16 @@ async function syncBranches(progressCallback = null) {
                 results.total++;
             }
 
-            // Update repo last synced
             db.run(`
                 UPDATE repositories SET last_synced_at = CURRENT_TIMESTAMP WHERE id = ?
             `, [repo.id]);
 
+            logger.debug(`Synced branches for ${repo.full_name}`);
+
         } catch (error) {
             results.failed++;
             results.errors.push(`Repo ${repo.full_name}: ${error.message}`);
+            logger.error(`Branch sync failed for ${repo.full_name}:`, error);
         }
     });
 
@@ -189,7 +196,7 @@ async function processCommit(client, repo, branchId, commit, force, results) {
         try {
             details = await client.getCommitDetails(repo.full_name, commit.sha);
         } catch (e) {
-            console.warn(`Failed to get details for ${commit.sha}: ${e.message}`);
+            logger.warn(`Failed to get details for ${commit.sha}: ${e.message}`);
         }
 
         // Insert or update commit
@@ -215,11 +222,14 @@ async function processCommit(client, repo, branchId, commit, force, results) {
         const commitId = result.lastInsertRowid ||
             db.get('SELECT id FROM commits WHERE repository_id = ? AND sha = ?', [repo.id, commit.sha]).id;
 
+        // Delete existing file details to avoid duplicates (and ensure clean state)
+        db.run('DELETE FROM commit_files WHERE commit_id = ?', [commitId]);
+
         // Insert file details
         for (const file of details.files) {
             const excluded = isFileExcluded(file.filename) ? 1 : 0;
             db.run(`
-                INSERT OR REPLACE INTO commit_files (
+                INSERT INTO commit_files (
                     commit_id, filename, status, lines_added, lines_removed, is_excluded
                 ) VALUES (?, ?, ?, ?, ?, ?)
             `, [commitId, file.filename, file.status, file.linesAdded, file.linesRemoved, excluded]);
@@ -374,8 +384,9 @@ async function syncCommits(fromDate, toDate, force = false, progressCallback = n
     // Process developer identities after sync
     try {
         processIdentities();
+        logger.info('Developer identities processed');
     } catch (error) {
-        console.error('Failed to process identities:', error.message);
+        logger.error('Failed to process identities:', error);
     }
 
     return results;

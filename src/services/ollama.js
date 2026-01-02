@@ -61,6 +61,14 @@ async function generateCommitSummary(commitMessage, diffContent, options = {}) {
         truncatedDiff = diffContent.substring(0, maxDiffLength) + '\n... (truncated)';
     }
 
+    // Validate inputs
+    if (!commitMessage) {
+        return { success: false, error: 'Commit message is required' };
+    }
+    if (!diffContent || diffContent.trim().length === 0) {
+        return { success: false, error: 'No diff content available for analysis' };
+    }
+
     const prompt = `You are a code reviewer. Analyze this git commit and provide a brief, professional summary.
 
 Commit Message: ${commitMessage}
@@ -87,7 +95,7 @@ Keep your response concise and focused on the technical changes.`;
                 top_p: 0.9
             }
         }, {
-            timeout: 60000  // 60 second timeout
+            timeout: 60000
         });
 
         return {
@@ -95,9 +103,16 @@ Keep your response concise and focused on the technical changes.`;
             summary: response.data.response
         };
     } catch (error) {
+        console.error('Ollama Generation Error:', error.message);
+        if (error.code === 'ECONNREFUSED') {
+            return {
+                success: false,
+                error: `Could not connect to Ollama at ${config.endpoint}. Is it running?`
+            };
+        }
         return {
             success: false,
-            error: error.message || 'Failed to generate summary'
+            error: error.response?.data?.error || error.message || 'Failed to generate summary'
         };
     }
 }
@@ -141,6 +156,13 @@ Provide brief, actionable feedback.`;
             analysis: response.data.response
         };
     } catch (error) {
+        console.error('Ollama Analysis Error:', error.message);
+        if (error.code === 'ECONNREFUSED') {
+            return {
+                success: false,
+                error: `Could not connect to Ollama at ${config.endpoint}. Is it running?`
+            };
+        }
         return {
             success: false,
             error: error.message

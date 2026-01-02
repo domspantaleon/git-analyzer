@@ -209,6 +209,8 @@ class AzureDevOpsClient {
             let linesAdded = 0;
             let linesRemoved = 0;
 
+            const type = typeof change.changeType === 'string' ? change.changeType.toLowerCase() : change.changeType;
+
             // Only try to get line counts for first 20 non-binary files
             if (filesToProcess.includes(change) && !this.isBinaryFile(filename)) {
                 try {
@@ -225,10 +227,10 @@ class AzureDevOpsClient {
                 } catch (e) {
                     // Silently continue - some files can't be diffed
                 }
-            } else if (change.changeType === 'add' || change.changeType === 1) {
+            } else if (type === 'add' || type === 1) {
                 // Estimate for new files we didn't process
                 linesAdded = 20;
-            } else if (change.changeType === 'delete' || change.changeType === 2) {
+            } else if (type === 'delete' || type === 2) {
                 linesRemoved = 20;
             } else {
                 // Estimate for edits we didn't process
@@ -260,8 +262,10 @@ class AzureDevOpsClient {
      * Get line change stats for a single file
      */
     async getFileChangeStats(project, repoName, filePath, sha, parentSha, changeType) {
+        const type = typeof changeType === 'string' ? changeType.toLowerCase() : changeType;
+
         // For new files, count all lines as added
-        if (changeType === 'add' || changeType === 1) {
+        if (type === 'add' || type === 1) {
             try {
                 const response = await this.client.get(
                     `/${project}/_apis/git/repositories/${repoName}/items?path=/${filePath}&versionDescriptor.version=${sha}&versionDescriptor.versionType=commit&api-version=6.0`,
@@ -276,7 +280,7 @@ class AzureDevOpsClient {
         }
 
         // For deleted files, count all lines as removed  
-        if (changeType === 'delete' || changeType === 2) {
+        if (type === 'delete' || type === 2) {
             if (!parentSha) return { added: 0, removed: 50 };
             try {
                 const response = await this.client.get(
@@ -292,7 +296,7 @@ class AzureDevOpsClient {
         }
 
         // For edits, we try to fetch both versions to compare line counts
-        if (changeType === 'edit' || changeType === 16) {
+        if (type === 'edit' || type === 16) {
             if (!parentSha) return { added: 10, removed: 5 };
             try {
                 // Fetch new content
@@ -351,43 +355,59 @@ class AzureDevOpsClient {
     /**
      * Get commit diff
      */
+    /**
+     * Get commit diff
+     */
     async getCommitDiff(repoFullName, sha) {
         const [project, repoName] = repoFullName.split('/');
 
-        // Get the commit to find parent
-        const commitResponse = await this.client.get(
-            `/${project}/_apis/git/repositories/${repoName}/commits/${sha}?api-version=6.0`
-        );
+        try {
+            // Get the commit to find parent
+            const commitResponse = await this.client.get(
+                `/${project}/_apis/git/repositories/${repoName}/commits/${sha}?api-version=6.0`
+            );
 
-        const commit = commitResponse.data;
-        const parentSha = commit.parents?.[0];
+            const commit = commitResponse.data;
+            const parentSha = commit.parents?.[0];
 
-        if (!parentSha) {
-            // Initial commit - no diff available
-            return '';
-        }
-
-        // Get diff between parent and this commit
-        const response = await this.client.get(
-            `/${project}/_apis/git/repositories/${repoName}/diffs/commits?baseVersion=${parentSha}&targetVersion=${sha}&api-version=6.0`
-        );
-
-        // Azure DevOps doesn't return unified diff format directly
-        // We need to construct it from the changes
-        const changes = response.data.changes || [];
-        let diffContent = '';
-
-        for (const change of changes) {
-            if (change.item?.path) {
-                diffContent += `diff --git a${change.item.path} b${change.item.path}\n`;
-                diffContent += `--- a${change.item.path}\n`;
-                diffContent += `+++ b${change.item.path}\n`;
-                // Note: Full diff content would require fetching each file's content
-                // This is a simplified version
+            if (!parentSha) {
+                // Initial commit - no diff available
+                return '';
             }
-        }
 
-        return diffContent;
+            // Get diff between parent and this commit
+            const response = await this.client.get(
+                `/${project}/_apis/git/repositories/${repoName}/diffs/commits?baseVersion=${parentSha}&targetVersion=${sha}&api-version=6.0`
+            );
+
+            // Azure DevOps doesn't return unified diff format directly
+            // We need to construct it from the changes
+            const changes = response.data.changes || [];
+            let diffContent = '';
+
+            for (const change of changes) {
+                if (change.item?.path) {
+                    diffContent += `diff --git a${change.item.path} b${change.item.path}\n`;
+                    diffContent += `--- a${change.item.path}\n`;
+                    diffContent += `+++ b${change.item.path}\n`;
+                    // Note: Full diff content would require fetching each file's content
+                    // which is too slow for real-time analysis
+                }
+            }
+
+            if (!diffContent) {
+                return 'No changes found in diff (Azure DevOps diff API limitation).';
+            }
+
+            return diffContent;
+
+        } catch (error) {
+            console.error(`Azure DevOps Diff Error (${repoFullName}/${sha}):`, error.message);
+            if (error.response?.status === 404) {
+                throw new Error(`Commit or repository not found on Azure DevOps (${repoFullName})`);
+            }
+            throw new Error(`Failed to fetch diff from Azure DevOps: ${error.message}`);
+        }
     }
 
     /**

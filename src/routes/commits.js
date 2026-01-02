@@ -203,6 +203,7 @@ router.get('/:id/ai-summary', async (req, res) => {
         const result = await generateCommitSummary(commit.message, diff);
         res.json(result);
     } catch (error) {
+        // Return 500 but with JSON error message for frontend to display
         res.status(500).json({ error: error.message });
     }
 });
