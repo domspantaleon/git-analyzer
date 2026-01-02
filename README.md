@@ -4,7 +4,7 @@ A powerful local tool for analyzing Git repositories from Azure DevOps, GitHub, 
 
 ## Features
 
-- **Multi-Platform Support**: Connect to Azure DevOps, GitHub, and GitLab.
+- **Multi-Platform Support**: Connect to Azure DevOps
 - **Interactive Dashboard**: Visualize commit activity, contributor stats, and project trends.
 - **Deep Analytics**: Analyze code churn, file changes, and development velocity.
 - **AI-Powered Insights**: Optional integration with LocalLLM (Ollama) for intelligent code summarization and pattern analysis.
