@@ -1,6 +1,6 @@
 # Git Analyzer
 
-A powerful local tool for analyzing Git repositories from Azure DevOps, GitHub, and GitLab. Git Analyzer provides deep insights into development activity, code churn, and project health through an intuitive dashboard.
+A powerful local tool for analyzing Git repositories from Azure DevOps. Git Analyzer provides deep insights into development activity, code churn, and project health through an intuitive dashboard.
 
 ## Features
 
