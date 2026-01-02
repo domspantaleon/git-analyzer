@@ -47,7 +47,27 @@ const Modal = {
         }
 
         // Apply size option
-        this.modal.style.maxWidth = options.maxWidth || '900px';
+        if (options.fullScreen) {
+            this.modal.style.maxWidth = '100vw';
+            this.modal.style.width = '100vw';
+            this.modal.style.height = '100vh';
+            this.modal.style.maxHeight = '100vh';
+            this.modal.style.borderRadius = '0';
+            this.modal.style.margin = '0';
+            this.modal.style.top = '0';
+            this.modal.style.left = '0';
+            this.modal.parentElement.style.padding = '0'; // Overlay padding
+        } else {
+            this.modal.style.maxWidth = options.maxWidth || '900px';
+            this.modal.style.width = '';
+            this.modal.style.height = '';
+            this.modal.style.maxHeight = '';
+            this.modal.style.borderRadius = '';
+            this.modal.style.margin = '';
+            this.modal.style.top = '';
+            this.modal.style.left = '';
+            this.modal.parentElement.style.padding = '';
+        }
 
         this.overlay.classList.add('open');
         document.body.style.overflow = 'hidden';
