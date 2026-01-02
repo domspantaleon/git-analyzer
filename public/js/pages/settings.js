@@ -76,6 +76,19 @@ const SettingsPage = {
                     </div>
                 </div>
             </div>
+            </div>
+
+            <div class="mt-8 text-center border-t border-gray-700 pt-6">
+                <p class="text-lg font-semibold text-gray-400">Azure Git Analyzer</p>
+                <p class="text-muted mb-3">&copy; ${new Date().getFullYear()} Dom Pantaleon</p>
+                
+                <a href="https://buymeacoffee.com/titodomph" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400 text-gray-900 rounded-lg hover:bg-yellow-300 transition-colors font-medium">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                        <path d="M20.216 6.415l-.132-.666c-.119-.596-.387-1.143-.79-1.597-.981-1.103-2.618-1.503-4.223-1.077l-9.03 2.392c-1.637.433-2.614 2.109-2.181 3.746l.132.666c.119.596.387 1.143.79 1.597.981 1.103 2.618 1.503 4.223 1.077l9.03-2.392c1.637-.433 2.614-2.109 2.181-3.746zM7.41 8.527c-.433-1.637.544-3.313 2.181-3.746l7.85-2.079c1.637-.433 3.313.544 3.746 2.181l.132.666c.433 1.637-.544 3.313-2.181 3.746l-7.85 2.079c-1.637.433-3.313-.544-3.746-2.181l-.132-.666zM19.5 14c-1.105 0-2-.895-2-2 0-.223.037-.436.104-.635l-2.07-5.068-1.52.404 1.74 4.264c.147.36.035.776-.263 1.026-.298.25-.724.28-1.053.076l-8.38-5.185-.758 1.35 9.07 5.614c.454.28.948.455 1.5.52.274.981 1.171 1.667 2.222 1.667 1.282 0 2.308-1.026 2.308-2.308 0-1.137-.81-2.083-1.89-2.275zm-1.5-1.5c.828 0 1.5.672 1.5 1.5s-.672 1.5-1.5 1.5-1.5-.672-1.5-1.5.672-1.5 1.5-1.5z"/>
+                    </svg>
+                    Buy me a coffee
+                </a>
+            </div>
         `;
 
         this.setupEventListeners();
@@ -149,7 +162,6 @@ const SettingsPage = {
                     <label>Platform Type</label>
                     <select id="platform-type" required ${isEdit ? 'disabled' : ''}>
                         <option value="">Select type...</option>
-                        <option value="azure_devops">Azure DevOps</option>
                         <option value="azure_devops">Azure DevOps</option>
                     </select>
                 </div>

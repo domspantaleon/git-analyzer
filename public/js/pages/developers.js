@@ -5,14 +5,18 @@
 
 const DevelopersPage = {
     developers: [],
+    currentDateRange: {
+        type: 'thisMonth', // today, last7, last14, last30, thisMonth, lastMonth
+        offset: 0 // for navigating months
+    },
 
-    async render(container, dateRange) {
+    async render(container) {
         container.innerHTML = `
             <div class="flex justify-between items-center mb-4">
                 <div class="flex gap-2">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="active-only" checked>
-                        Active only
+                    <label class="checkbox-label flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" id="active-only" checked class="form-checkbox bg-gray-800 border-gray-700 rounded text-blue-500">
+                        <span>Active only</span>
                     </label>
                 </div>
             </div>
@@ -28,13 +32,62 @@ const DevelopersPage = {
         `;
 
         document.getElementById('active-only').addEventListener('change', () => this.loadDevelopers());
-
         await this.loadDevelopers();
+    },
+
+    getDateRange() {
+        const { type, offset } = this.currentDateRange;
+        const now = new Date();
+        let start = new Date();
+        let end = new Date();
+
+        // Helper to shift months
+        const addMonths = (date, months) => {
+            const d = new Date(date);
+            d.setMonth(d.getMonth() + months);
+            return d;
+        };
+
+        switch (type) {
+            case 'today':
+                start.setDate(now.getDate() + offset);
+                end = new Date(start);
+                end.setHours(23, 59, 59, 999);
+                start.setHours(0, 0, 0, 0);
+                break;
+            case 'last7':
+                end = new Date();
+                end.setDate(now.getDate() + (offset * 7));
+                start = new Date(end);
+                start.setDate(end.getDate() - 6);
+                break;
+            case 'last14':
+                end.setDate(now.getDate() + (offset * 14));
+                start = new Date(end);
+                start.setDate(end.getDate() - 13);
+                break;
+            case 'last30':
+                end.setDate(now.getDate() + (offset * 30));
+                start = new Date(end);
+                start.setDate(end.getDate() - 29);
+                break;
+            case 'thisMonth':
+            case 'lastMonth':
+                let baseOffset = type === 'lastMonth' ? -1 : 0;
+                let targetDate = addMonths(now, baseOffset + offset);
+                start = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+                end = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+                end.setHours(23, 59, 59, 999);
+                break;
+        }
+
+        const fmt = d => d.toISOString().split('T')[0];
+        return { start: fmt(start), end: fmt(end), startObj: start, endObj: end };
     },
 
     async loadDevelopers() {
         const tableContainer = document.getElementById('developers-table');
-        const activeOnly = document.getElementById('active-only').checked;
+        const activeOnly = document.getElementById('active-only')?.checked ?? true;
 
         try {
             this.developers = await API.developers.list({ active_only: activeOnly });
@@ -141,26 +194,61 @@ const DevelopersPage = {
     },
 
     async showDetails(developerId) {
+        // Store current developer ID for reference during date changes
+        this.currentDeveloperId = developerId;
+
         try {
             const identities = await API.developers.getIdentities(developerId);
             const dev = this.developers.find(d => d.id === developerId);
+            const { start, end } = this.getDateRange();
 
             const content = `
-                <div class="developer-details">
+                <div class="developer-details" data-developer-id="${developerId}">
+                    <!-- Date Range Controls -->
+                    <div class="flex items-center gap-4 mb-4 p-3 bg-gray-800 rounded border border-gray-700">
+                        <select id="modal-date-range-select" class="form-select bg-gray-900 text-white border border-gray-600 rounded p-2" onchange="DevelopersPage.handleModalRangeChange(this.value)">
+                            <option value="today" ${this.currentDateRange.type === 'today' ? 'selected' : ''}>Today</option>
+                            <option value="last7" ${this.currentDateRange.type === 'last7' ? 'selected' : ''}>Last 7 Days</option>
+                            <option value="last14" ${this.currentDateRange.type === 'last14' ? 'selected' : ''}>Last 14 Days</option>
+                            <option value="last30" ${this.currentDateRange.type === 'last30' ? 'selected' : ''}>Last 30 Days</option>
+                            <option value="thisMonth" ${this.currentDateRange.type === 'thisMonth' ? 'selected' : ''}>This Month</option>
+                            <option value="lastMonth" ${this.currentDateRange.type === 'lastMonth' ? 'selected' : ''}>Last Month</option>
+                        </select>
+                        
+                        <div class="flex items-center gap-2">
+                            <button class="btn btn-sm btn-secondary" onclick="DevelopersPage.navigateModalDate(-1)">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                            </button>
+                            <span id="modal-date-label" class="text-sm font-mono min-w-[200px] text-center"></span>
+                            <button class="btn btn-sm btn-secondary" onclick="DevelopersPage.navigateModalDate(1)">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="tabs mb-4">
-                        <button class="tab active" onclick="DevelopersPage.switchTab('activity')">Activity</button>
+                        <button class="tab active" onclick="DevelopersPage.switchTab('breakdown')">Daily Breakdown</button>
+                        <button class="tab" onclick="DevelopersPage.switchTab('activity')">Activity</button>
                         <button class="tab" onclick="DevelopersPage.switchTab('profile')">Profile</button>
                     </div>
 
-                    <div id="tab-activity" class="tab-content active">
+                    <div id="tab-breakdown" class="tab-content active">
+                        <div id="daily-breakdown">
+                            <div class="loading-spinner">
+                                <div class="spinner"></div>
+                                <p>Loading breakdown...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tab-activity" class="tab-content">
                         <div class="flex justify-between items-center mb-4">
                             <h3>Activity Timeline</h3>
                             <div class="flex gap-2">
                                 <select id="activity-limit" onchange="DevelopersPage.loadDeveloperActivity(${developerId})">
                                     <option value="50">Last 50 commits</option>
-                                    <option value="100" selected>Last 100 commits</option>
-                                    <option value="200">Last 200 commits</option>
-                                    <option value="0">All time</option>
+                                    <option value="100">Last 100 commits</option>
+                                    <option value="0" selected>All in range</option>
                                 </select>
                             </div>
                         </div>
@@ -200,7 +288,7 @@ const DevelopersPage = {
                         </table>
                         
                         <div class="mt-4">
-                            <h4>Stats</h4>
+                            <h4>All-Time Stats</h4>
                             <div class="grid grid-cols-3 gap-4 mt-2">
                                 <div class="stat-card p-3 bg-tertiary rounded">
                                     <div class="text-xs text-muted uppercase">Commits</div>
@@ -223,10 +311,11 @@ const DevelopersPage = {
             Modal.open(dev?.canonical_name || 'Developer Details', content, {
                 fullScreen: false,
                 allowExpand: true,
-                maxWidth: '1200px' // Give it a good default width since we have columns
+                maxWidth: '1200px'
             });
 
-            // Load activity immediately
+            // Update date label and load activity
+            this.updateModalDateLabel();
             this.loadDeveloperActivity(developerId);
 
         } catch (error) {
@@ -234,13 +323,49 @@ const DevelopersPage = {
         }
     },
 
+    handleModalRangeChange(type) {
+        this.currentDateRange.type = type;
+        this.currentDateRange.offset = 0;
+        this.updateModalDateLabel();
+        if (this.currentDeveloperId) {
+            this.loadDeveloperActivity(this.currentDeveloperId);
+        }
+    },
+
+    navigateModalDate(direction) {
+        this.currentDateRange.offset += direction;
+        this.updateModalDateLabel();
+        if (this.currentDeveloperId) {
+            this.loadDeveloperActivity(this.currentDeveloperId);
+        }
+    },
+
+    updateModalDateLabel() {
+        const { startObj, endObj } = this.getDateRange();
+        const fmt = d => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+        const label = document.getElementById('modal-date-label');
+        if (label) {
+            if (this.currentDateRange.type === 'today') {
+                label.textContent = fmt(startObj);
+            } else if (startObj.getMonth() === endObj.getMonth() && startObj.getFullYear() === endObj.getFullYear()) {
+                if (startObj.getDate() === 1 && endObj.getDate() === new Date(endObj.getFullYear(), endObj.getMonth() + 1, 0).getDate()) {
+                    label.textContent = startObj.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+                } else {
+                    label.textContent = `${fmt(startObj)} - ${fmt(endObj)}`;
+                }
+            } else {
+                label.textContent = `${fmt(startObj)} - ${fmt(endObj)}`;
+            }
+        }
+    },
+
     switchTab(tabName) {
         document.querySelectorAll('.developer-details .tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.developer-details .tab-content').forEach(c => c.classList.remove('active'));
 
-        // Find the button (this is a bit hacky selector-wise but works)
         const buttons = document.querySelectorAll('.developer-details .tab');
-        const targetBtn = Array.from(buttons).find(b => b.textContent.toLowerCase() === tabName);
+        const targetBtn = Array.from(buttons).find(b => b.onclick.toString().includes(tabName));
         if (targetBtn) targetBtn.classList.add('active');
 
         document.getElementById(`tab-${tabName}`).classList.add('active');
@@ -248,27 +373,95 @@ const DevelopersPage = {
 
     async loadDeveloperActivity(developerId) {
         const container = document.getElementById('activity-timeline');
+        const breakdownContainer = document.getElementById('daily-breakdown');
         const limit = document.getElementById('activity-limit').value;
+        const { start, end } = this.getDateRange();
 
-        container.innerHTML = `
-            <div class="loading-spinner">
-                <div class="spinner"></div>
-                <p>Loading activity...</p>
-            </div>
-        `;
+        if (container) {
+            container.innerHTML = `
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Loading activity...</p>
+                </div>
+            `;
+        }
 
         try {
             const params = {
                 developer_id: developerId,
                 limit: limit === '0' ? 1000 : parseInt(limit),
-                page: 1
+                page: 1,
+                from: start,
+                to: end
             };
 
             const result = await API.commits.list(params);
-            this.renderActivityTimeline(result.data, container);
+
+            if (container) this.renderActivityTimeline(result.data, container);
+            if (breakdownContainer) this.renderDailyBreakdown(result.data, breakdownContainer);
+
         } catch (error) {
-            container.innerHTML = `<p class="text-danger">Failed to load activity: ${error.message}</p>`;
+            const msg = `<p class="text-danger">Failed to load activity: ${error.message}</p>`;
+            if (container) container.innerHTML = msg;
+            if (breakdownContainer) breakdownContainer.innerHTML = msg;
         }
+    },
+
+    renderDailyBreakdown(commits, container) {
+        if (!commits || commits.length === 0) {
+            container.innerHTML = `<div class="p-8 text-center text-muted italic">No activity found for this period</div>`;
+            return;
+        }
+
+        const stats = {};
+        commits.forEach(c => {
+            const date = c.committed_at.split('T')[0];
+            if (!stats[date]) {
+                stats[date] = { commits: 0, added: 0, removed: 0 };
+            }
+            stats[date].commits++;
+            stats[date].added += (c.lines_added || 0);
+            stats[date].removed += (c.lines_removed || 0);
+        });
+
+        // Sort dates
+        const sortedDates = Object.keys(stats).sort().reverse();
+
+        let html = `
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="text-xs text-muted uppercase border-b border-gray-700 bg-gray-900">
+                        <th class="p-3">Date</th>
+                        <th class="p-3 text-right">Commits</th>
+                        <th class="p-3 text-right">Lines Added</th>
+                        <th class="p-3 text-right">Lines Removed</th>
+                        <th class="p-3 text-right">Net Change</th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm">
+        `;
+
+        sortedDates.forEach(date => {
+            const s = stats[date];
+            const net = s.added - s.removed;
+            const netClass = net > 0 ? 'text-success' : (net < 0 ? 'text-danger' : 'text-muted');
+
+            const dateObj = new Date(date);
+            const dateStr = dateObj.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+
+            html += `
+                <tr class="border-b border-gray-800 hover:bg-gray-800 transition-colors">
+                    <td class="p-3 font-mono">${dateStr}</td>
+                    <td class="p-3 text-right font-bold">${s.commits}</td>
+                    <td class="p-3 text-right text-success">+${Table.formatNumber(s.added)}</td>
+                    <td class="p-3 text-right text-danger">-${Table.formatNumber(s.removed)}</td>
+                    <td class="p-3 text-right ${netClass}">${net > 0 ? '+' : ''}${Table.formatNumber(net)}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
     },
 
     renderActivityTimeline(commits, container) {

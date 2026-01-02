@@ -8,23 +8,40 @@ router.get('/', (req, res) => {
     try {
         const { active_only } = req.query;
 
+        const { start_date, end_date } = req.query;
+        let dateWhere = '';
+        const dateParams = [];
+
+        if (start_date) {
+            dateWhere += ' AND date(committed_at) >= date(?)';
+            dateParams.push(start_date);
+        }
+        if (end_date) {
+            dateWhere += ' AND date(committed_at) <= date(?)';
+            dateParams.push(end_date);
+        }
+
         let sql = `
             SELECT d.*, 
-                   (SELECT COUNT(*) FROM commits WHERE developer_id = d.id) as commit_count,
-                   (SELECT SUM(lines_added) FROM commits WHERE developer_id = d.id) as total_lines_added,
-                   (SELECT SUM(lines_removed) FROM commits WHERE developer_id = d.id) as total_lines_removed,
+                   (SELECT COUNT(*) FROM commits WHERE developer_id = d.id ${dateWhere}) as commit_count,
+                   (SELECT SUM(lines_added) FROM commits WHERE developer_id = d.id ${dateWhere}) as total_lines_added,
+                   (SELECT SUM(lines_removed) FROM commits WHERE developer_id = d.id ${dateWhere}) as total_lines_removed,
                    (SELECT GROUP_CONCAT(DISTINCT email) FROM developer_identities WHERE developer_id = d.id) as emails
             FROM developers d
             WHERE 1=1
         `;
 
+        // Add active filter
         if (active_only === 'true') {
             sql += ' AND d.is_active = 1';
         }
 
         sql += ' ORDER BY commit_count DESC';
 
-        const developers = db.all(sql);
+        // We need to repeat params for each subquery (3 subqueries)
+        const finalParams = [...dateParams, ...dateParams, ...dateParams];
+
+        const developers = db.all(sql, finalParams);
         res.json(developers);
     } catch (error) {
         res.status(500).json({ error: error.message });
