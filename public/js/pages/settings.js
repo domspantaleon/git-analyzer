@@ -1,0 +1,364 @@
+/**
+ * Settings Page
+ * Configure platforms, Ollama, and app settings
+ */
+
+const SettingsPage = {
+    async render(container, dateRange) {
+        container.innerHTML = `
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Platforms -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Platforms</h3>
+                        <button class="btn btn-sm btn-primary" id="add-platform-btn">+ Add Platform</button>
+                    </div>
+                    <div id="platforms-list">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ollama -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Ollama (AI)</h3>
+                    </div>
+                    <div class="form-group">
+                        <label>Endpoint URL</label>
+                        <input type="url" id="ollama-endpoint" placeholder="http://localhost:11434">
+                    </div>
+                    <div class="form-group">
+                        <label>Model</label>
+                        <input type="text" id="ollama-model" placeholder="llama3">
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn btn-secondary" id="test-ollama-btn">Test Connection</button>
+                        <button class="btn btn-primary" id="save-ollama-btn">Save</button>
+                    </div>
+                    <div id="ollama-status" class="mt-2"></div>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <!-- General Settings -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">General Settings</h3>
+                    </div>
+                    <div class="form-group">
+                        <label>Default Date Range (days)</label>
+                        <input type="number" id="default-days" min="1" max="365">
+                    </div>
+                    <div class="form-group">
+                        <label>Timezone</label>
+                        <select id="timezone">
+                            <option value="Asia/Manila">Asia/Manila</option>
+                            <option value="UTC">UTC</option>
+                            <option value="America/New_York">America/New_York</option>
+                            <option value="Europe/London">Europe/London</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="save-general-btn">Save</button>
+                </div>
+                
+                <!-- Data Management -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Data Management</h3>
+                    </div>
+                    <p class="text-muted mb-3">Manage your local database and data.</p>
+                    <div class="flex gap-2 flex-col">
+                        <button class="btn btn-danger" id="clear-data-btn">
+                            Clear All Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        this.setupEventListeners();
+        await this.loadSettings();
+        await this.loadPlatforms();
+    },
+
+    setupEventListeners() {
+        document.getElementById('add-platform-btn').addEventListener('click', () => this.showPlatformModal());
+        document.getElementById('test-ollama-btn').addEventListener('click', () => this.testOllama());
+        document.getElementById('save-ollama-btn').addEventListener('click', () => this.saveOllama());
+        document.getElementById('save-general-btn').addEventListener('click', () => this.saveGeneral());
+        document.getElementById('clear-data-btn').addEventListener('click', () => this.clearData());
+    },
+
+    async loadSettings() {
+        try {
+            const settings = await API.settings.get();
+
+            document.getElementById('ollama-endpoint').value = settings.ollama_endpoint || 'http://localhost:11434';
+            document.getElementById('ollama-model').value = settings.ollama_model || 'llama3';
+            document.getElementById('default-days').value = settings.default_date_range_days || 7;
+            document.getElementById('timezone').value = settings.timezone || 'Asia/Manila';
+
+        } catch (error) {
+            console.error('Failed to load settings:', error);
+        }
+    },
+
+    async loadPlatforms() {
+        const container = document.getElementById('platforms-list');
+
+        try {
+            const platforms = await API.platforms.list();
+
+            if (platforms.length === 0) {
+                container.innerHTML = `
+                    <p class="text-muted">No platforms configured. Add one to get started.</p>
+                `;
+                return;
+            }
+
+            container.innerHTML = platforms.map(p => `
+                <div class="flex items-center justify-between mb-3 p-3" style="background: var(--bg-tertiary); border-radius: 6px;">
+                    <div class="flex items-center gap-3">
+                        ${Table.renderPlatformIcon(p.type)}
+                        <div>
+                            <strong>${p.name}</strong>
+                            <div class="text-muted text-sm">${p.url}</div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="btn btn-sm btn-secondary" onclick="SettingsPage.testPlatform(${p.id})">Test</button>
+                        <button class="btn btn-sm btn-secondary" onclick="SettingsPage.showPlatformModal(${p.id})">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="SettingsPage.deletePlatform(${p.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+
+        } catch (error) {
+            container.innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+        }
+    },
+
+    showPlatformModal(platformId = null) {
+        const isEdit = platformId !== null;
+
+        const content = `
+            <form id="platform-form">
+                <div class="form-group">
+                    <label>Platform Type</label>
+                    <select id="platform-type" required ${isEdit ? 'disabled' : ''}>
+                        <option value="">Select type...</option>
+                        <option value="azure_devops">Azure DevOps</option>
+                        <option value="github">GitHub</option>
+                        <option value="gitlab">GitLab</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Display Name</label>
+                    <input type="text" id="platform-name" required placeholder="My Organization">
+                </div>
+                
+                <div class="form-group">
+                    <label>URL / Organization</label>
+                    <input type="text" id="platform-url" required placeholder="https://dev.azure.com/myorg">
+                    <small class="text-muted">
+                        Azure: dev.azure.com/org or org.visualstudio.com<br>
+                        GitHub: github.com/org or just org name<br>
+                        GitLab: gitlab.com/group
+                    </small>
+                </div>
+                
+                <div class="form-group" id="username-group" style="display: none;">
+                    <label>Username</label>
+                    <input type="text" id="platform-username" placeholder="Your username (for Azure DevOps basic auth)">
+                    <small class="text-muted">Required for Azure DevOps when using username/password auth</small>
+                </div>
+                
+                <div class="form-group">
+                    <label id="token-label">Personal Access Token (PAT)</label>
+                    <input type="password" id="platform-token" required placeholder="Your PAT or password">
+                </div>
+                
+                <div class="flex justify-between mt-4">
+                    <button type="button" class="btn btn-secondary" onclick="Modal.close()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">${isEdit ? 'Update' : 'Add'} Platform</button>
+                </div>
+            </form>
+        `;
+
+        Modal.open(isEdit ? 'Edit Platform' : 'Add Platform', content, { maxWidth: '500px' });
+
+        // Show/hide username field based on platform type
+        const typeSelect = document.getElementById('platform-type');
+        const usernameGroup = document.getElementById('username-group');
+        const tokenLabel = document.getElementById('token-label');
+
+        const updateUsernameVisibility = () => {
+            if (typeSelect.value === 'azure_devops') {
+                usernameGroup.style.display = 'block';
+                tokenLabel.textContent = 'Password or PAT';
+            } else {
+                usernameGroup.style.display = 'none';
+                tokenLabel.textContent = 'Personal Access Token (PAT)';
+            }
+        };
+
+        typeSelect.addEventListener('change', updateUsernameVisibility);
+
+        // If editing, load existing data
+        if (isEdit) {
+            API.platforms.list().then(platforms => {
+                const p = platforms.find(x => x.id === platformId);
+                if (p) {
+                    document.getElementById('platform-type').value = p.type;
+                    document.getElementById('platform-name').value = p.name;
+                    document.getElementById('platform-url').value = p.url;
+                    if (p.username) {
+                        document.getElementById('platform-username').value = p.username;
+                    }
+                    updateUsernameVisibility();
+                }
+            });
+        }
+
+        document.getElementById('platform-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                type: document.getElementById('platform-type').value,
+                name: document.getElementById('platform-name').value,
+                url: document.getElementById('platform-url').value,
+                token: document.getElementById('platform-token').value
+            };
+
+            // Add username for Azure DevOps
+            if (data.type === 'azure_devops') {
+                data.username = document.getElementById('platform-username').value || null;
+            }
+
+            try {
+                if (isEdit) {
+                    await API.platforms.update(platformId, data);
+                    Toast.show('Platform updated', 'success');
+                } else {
+                    await API.platforms.create(data);
+                    Toast.show('Platform added', 'success');
+                }
+                Modal.close();
+                await this.loadPlatforms();
+            } catch (error) {
+                Toast.show(`Failed: ${error.message}`, 'error');
+            }
+        });
+    },
+
+    async testPlatform(platformId) {
+        if (window.Console) {
+            Console.info(`Testing connection for platform #${platformId}...`);
+        }
+
+        try {
+            const result = await API.platforms.test(platformId);
+
+            if (result.success) {
+                if (window.Console) {
+                    Console.success(`Connection test passed: ${result.message}`);
+                }
+                Toast.show(result.message, 'success');
+            } else {
+                if (window.Console) {
+                    Console.error(`Connection test failed: ${result.message}`);
+                }
+                Toast.show(result.message || 'Connection test failed', 'error');
+            }
+        } catch (error) {
+            if (window.Console) {
+                Console.error(`Connection test error: ${error.message}`);
+            }
+            Toast.show(`Test failed: ${error.message}`, 'error');
+        }
+    },
+
+    async deletePlatform(platformId) {
+        const confirmed = await Modal.confirm(
+            'Delete Platform',
+            'Are you sure you want to delete this platform? This will also delete all associated repositories and commits.',
+            { danger: true, confirmText: 'Delete' }
+        );
+
+        if (confirmed) {
+            try {
+                await API.platforms.delete(platformId);
+                Toast.show('Platform deleted', 'success');
+                await this.loadPlatforms();
+            } catch (error) {
+                Toast.show(`Failed: ${error.message}`, 'error');
+            }
+        }
+    },
+
+    async testOllama() {
+        const statusEl = document.getElementById('ollama-status');
+        statusEl.innerHTML = '<span class="text-muted">Testing...</span>';
+
+        const endpoint = document.getElementById('ollama-endpoint').value;
+
+        try {
+            const response = await fetch(`${endpoint}/api/tags`, {
+                method: 'GET',
+                signal: AbortSignal.timeout(5000)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const models = data.models?.map(m => m.name).join(', ') || 'No models found';
+                statusEl.innerHTML = `<span class="text-success">✓ Connected. Models: ${models}</span>`;
+            } else {
+                statusEl.innerHTML = `<span class="text-danger">✗ Failed: HTTP ${response.status}</span>`;
+            }
+        } catch (error) {
+            statusEl.innerHTML = `<span class="text-danger">✗ ${error.message}</span>`;
+        }
+    },
+
+    async saveOllama() {
+        try {
+            await API.settings.update({
+                ollama_endpoint: document.getElementById('ollama-endpoint').value,
+                ollama_model: document.getElementById('ollama-model').value
+            });
+            Toast.show('Ollama settings saved', 'success');
+        } catch (error) {
+            Toast.show(`Failed: ${error.message}`, 'error');
+        }
+    },
+
+    async saveGeneral() {
+        try {
+            await API.settings.update({
+                default_date_range_days: document.getElementById('default-days').value,
+                timezone: document.getElementById('timezone').value
+            });
+            Toast.show('Settings saved', 'success');
+        } catch (error) {
+            Toast.show(`Failed: ${error.message}`, 'error');
+        }
+    },
+
+    async clearData() {
+        const confirmed = await Modal.confirm(
+            'Clear All Data',
+            'This will delete ALL data including platforms, repositories, commits, and developers. This cannot be undone!',
+            { danger: true, confirmText: 'Clear Everything' }
+        );
+
+        if (confirmed) {
+            Toast.show('Clear data functionality requires server restart', 'warning');
+        }
+    }
+};
+
+// Make SettingsPage globally available
+window.SettingsPage = SettingsPage;
