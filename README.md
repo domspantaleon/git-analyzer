@@ -11,9 +11,30 @@ A powerful local tool for analyzing Git repositories from Azure DevOps, GitHub, 
 - **Developer Profiles**: detailed activity tracking for individual contributors.
 - **Export Capabilities**: Export data for external reporting.
 
+## Tech Stack
+
+- **Frontend**: HTML5, CSS3, Vanilla JavaScript
+- **Backend**: Node.js, Express
+- **Database**: SQLite (via `better-sqlite3`)
+- **AI**: Ollama (Local LLM Integration)
+
 ## Git Operations & Security
 
-This application is strictly **Read-Only**. It does not execute local `git` commands (like `commit`, `push`, `merge`) and interacts with repositories exclusively via the providers' REST APIs to fetch data. It will never modify your source code or repository history.
+This application is designed with security as a priority. It is strictly **Read-Only** and **does not execute any local shell commands**.
+
+- **Zero Shell Execution**: The application does NOT use `exec`, `spawn`, or `child_process` to run `git` commands on your machine.
+- **REST API Only**: All git-related data (history, diffs, blame) is fetched exclusively via provider REST APIs (Azure DevOps, GitHub, GitLab).
+- **No Source Code Modification**: The tool never pushes, commits, or modifies your repository code or history.
+
+### Git Command Mapping
+Since the app uses APIs instead of local commands, here is how features map to Git concepts:
+
+| Git Concept | Implementation |
+| :--- | :--- |
+| `git log` | Fetched via `GET .../commits` |
+| `git show <commit>` | Fetched via `GET .../commits/{sha}` |
+| `git diff` | Fetched via `GET .../diffs` |
+| `git status` | N/A (Live working tree not monitored) |
 
 ### Verified API Operations
 The application uses the following read-only API endpoints:
