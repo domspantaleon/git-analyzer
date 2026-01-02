@@ -327,7 +327,7 @@ const DevelopersPage = {
                         <td class="p-3">
                             <div class="font-medium text-blue-400" style="white-space: normal;" title="${commit.message}">
                                 ${firstLine}
-                                <span class="px-2 py-0.5 ml-2 text-xs rounded bg-gray-700 text-gray-300 font-mono inline-block border border-gray-600">${commit.sha.substring(0, 7)}</span>
+                                <span class="px-2 py-0.5 ml-2 text-xs rounded-full bg-gray-700 text-gray-300 font-mono inline-block border border-gray-600">${commit.sha.substring(0, 7)}</span>
                             </div>
                         </td>
                         <td class="p-3 text-xs text-muted">
@@ -337,17 +337,19 @@ const DevelopersPage = {
                         <td class="p-3 text-right text-success font-mono">+${commit.lines_added}</td>
                         <td class="p-3 text-right text-danger font-mono">-${commit.lines_removed}</td>
                         <td class="p-3 text-right text-muted">${commit.files_changed}</td>
-                        <td class="p-3 text-center flex items-center justify-center gap-2">
-                            <a href="${this.generateFileLink(commit.platform_type, commit.platform_url, commit.repo_name, commit.sha, null)}" 
-                               target="_blank" 
-                               class="text-muted hover:text-white p-1" 
-                               title="Open Commit" 
-                               onclick="event.stopPropagation()">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                            </a>
-                            <svg class="w-4 h-4 text-muted transition-transform duration-200" id="chevron-${commit.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                            </svg>
+                        <td class="p-3 text-center align-middle whitespace-nowrap">
+                            <div class="flex items-center justify-center gap-2">
+                                <a href="${this.generateFileLink(commit.platform_type, commit.platform_url, commit.repo_name, commit.sha, null)}" 
+                                   target="_blank" 
+                                   class="text-muted hover:text-white p-1" 
+                                   title="Open Commit" 
+                                   onclick="event.stopPropagation()">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                </a>
+                                <svg class="w-4 h-4 text-muted transition-transform duration-200" id="chevron-${commit.id}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </div>
                         </td>
                     </tr>
                     <!-- Child Row -->
