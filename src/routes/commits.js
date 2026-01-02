@@ -122,9 +122,11 @@ router.get('/:id', (req, res) => {
             SELECT c.*, 
                    r.name as repo_name, r.full_name as repo_full_name,
                    b.name as branch_name,
-                   d.canonical_name as developer_name
+                   d.canonical_name as developer_name,
+                   p.type as platform_type, p.url as platform_url
             FROM commits c
             JOIN repositories r ON c.repository_id = r.id
+            JOIN platforms p ON r.platform_id = p.id
             LEFT JOIN branches b ON c.branch_id = b.id
             LEFT JOIN developers d ON c.developer_id = d.id
             WHERE c.id = ?

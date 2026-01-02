@@ -377,7 +377,7 @@ class AzureDevOpsClient {
 
             // Get diff between parent and this commit
             const response = await this.client.get(
-                `/${project}/_apis/git/repositories/${repoName}/diffs/commits?baseVersion=${parentSha}&targetVersion=${sha}&api-version=6.0`
+                `/${project}/_apis/git/repositories/${repoName}/diffs/commits?baseVersion=${parentSha}&baseVersionType=commit&targetVersion=${sha}&targetVersionType=commit&api-version=6.0`
             );
 
             // Azure DevOps doesn't return unified diff format directly

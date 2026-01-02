@@ -29,8 +29,8 @@ router.post('/', (req, res) => {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        if (!['azure_devops', 'github', 'gitlab'].includes(type)) {
-            return res.status(400).json({ error: 'Invalid platform type' });
+        if (type !== 'azure_devops') {
+            return res.status(400).json({ error: 'Only Azure DevOps is supported' });
         }
 
         const result = db.run(`

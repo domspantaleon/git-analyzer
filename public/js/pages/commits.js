@@ -173,6 +173,22 @@ const CommitsPage = {
                         key: 'flags',
                         label: 'Flags',
                         render: (val) => Table.renderFlags(val)
+                    },
+                    {
+                        key: 'id',
+                        label: 'Actions',
+                        align: 'right',
+                        render: (val, row) => {
+                            const link = this.generateFileLink(row.platform_type, row.platform_url, row.repo_full_name, row.sha, null);
+                            return `
+                                <a href="${link}" target="_blank" 
+                                   class="text-muted hover:text-white p-1 inline-flex" 
+                                   title="Open Commit" 
+                                   onclick="event.stopPropagation()">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                </a>
+                            `;
+                        }
                     }
                 ],
                 data: result.data,
@@ -281,17 +297,27 @@ const CommitsPage = {
                                         <th style="text-align: right;">+</th>
                                         <th style="text-align: right;">-</th>
                                         <th>Status</th>
+                                        <th style="text-align: right;">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${commit.files.map(f => `
-                                        <tr class="${f.is_excluded ? 'text-muted' : ''}">
-                                            <td>${f.filename}${f.is_excluded ? ' (excluded)' : ''}</td>
-                                            <td style="text-align: right;" class="text-success">+${f.lines_added || 0}</td>
-                                            <td style="text-align: right;" class="text-danger">-${f.lines_removed || 0}</td>
-                                            <td>${f.status || 'modified'}</td>
-                                        </tr>
-                                    `).join('')}
+                                    ${commit.files.map(f => {
+                const link = this.generateFileLink(commit.platform_type, commit.platform_url, commit.repo_full_name, commit.sha, f.filename);
+                return `
+                                            <tr class="${f.is_excluded ? 'text-muted' : ''}">
+                                                <td>${f.filename}${f.is_excluded ? ' (excluded)' : ''}</td>
+                                                <td style="text-align: right;" class="text-success">+${f.lines_added || 0}</td>
+                                                <td style="text-align: right;" class="text-danger">-${f.lines_removed || 0}</td>
+                                                <td>${f.status || 'modified'}</td>
+                                                <td style="text-align: right;">
+                                                    <a href="${link}" target="_blank" class="inline-flex items-center px-2 py-1 rounded border border-gray-700 hover:bg-gray-700 hover:text-white text-xs text-muted transition-colors">
+                                                        <span>View</span>
+                                                        <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        `;
+            }).join('')}
                                 </tbody>
                             </table>
                         ` : '<p class="text-muted">No file details available</p>'}
@@ -368,6 +394,65 @@ const CommitsPage = {
         } catch (error) {
             Toast.show(`Failed to load commit: ${error.message}`, 'error');
         }
+    },
+
+    generateFileLink(platformType, platformUrl, repoFullName, sha, filename) {
+        if (!platformUrl || platformUrl === 'null') return '#';
+
+        // Clean URL (remove trailing slash)
+        let baseUrl = platformUrl.replace(/\/$/, '');
+
+        // Remove credentials/username from URL (e.g. https://user@dev.azure.com -> https://dev.azure.com)
+        baseUrl = baseUrl.replace(/:\/\/[^@\/]+@/, '://');
+
+        // Handle Azure DevOps
+        if (platformType === 'azure_devops') {
+            // Fix: Strip existing /_git/ from config URL to prevent doubling
+            if (baseUrl.toLowerCase().includes('/_git/')) {
+                baseUrl = baseUrl.split(/\/_git\//i)[0];
+            }
+            baseUrl = baseUrl.replace(/\/$/, '');
+
+            const parts = repoFullName.split('/'); // "Project/Repo"
+            let project, repo;
+
+            if (parts.length >= 2) {
+                project = parts[0];
+                repo = parts.slice(1).join('/');
+            } else {
+                project = repoFullName;
+                repo = repoFullName;
+            }
+
+            // If baseUrl already includes the project name, strip it to avoid duplication
+            // We want base to be https://dev.azure.com/Org
+            if (baseUrl.toLowerCase().endsWith(`/${project.toLowerCase()}`)) {
+                baseUrl = baseUrl.substring(0, baseUrl.length - project.length - 1);
+            }
+
+            // Encode components to be safe
+            const encProject = encodeURIComponent(project);
+            const encRepo = encodeURIComponent(repo);
+
+            let url = `${baseUrl}/${encProject}/_git/${encRepo}/commit/${sha}`;
+
+            if (filename) {
+                const path = filename.startsWith('/') ? filename : '/' + filename;
+                // Use encodeURI for path to preserve slashes but encode spaces/etc
+                const encodedPath = encodeURI(path);
+                url += `?path=${encodedPath}`;
+            }
+
+            return url;
+        }
+
+        // Handle GitHub
+        if (platformType === 'github') {
+            // https://github.com/Owner/Repo/blob/SHA/filename
+            return `https://github.com/${repoFullName}/blob/${sha}/${filename}`;
+        }
+
+        return '#';
     }
 };
 

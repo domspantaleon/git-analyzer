@@ -1,7 +1,7 @@
 {
-  "name": "git-analyzer",
+  "name": "azure-git-analyzer",
   "version": "1.0.0",
-  "description": "Local Git Analyzer tool for Azure DevOps, GitHub, and GitLab",
+  "description": "Local Git Analyzer tool for Azure DevOps",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

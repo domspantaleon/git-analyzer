@@ -150,8 +150,7 @@ const SettingsPage = {
                     <select id="platform-type" required ${isEdit ? 'disabled' : ''}>
                         <option value="">Select type...</option>
                         <option value="azure_devops">Azure DevOps</option>
-                        <option value="github">GitHub</option>
-                        <option value="gitlab">GitLab</option>
+                        <option value="azure_devops">Azure DevOps</option>
                     </select>
                 </div>
                 
@@ -165,8 +164,7 @@ const SettingsPage = {
                     <input type="text" id="platform-url" required placeholder="https://dev.azure.com/myorg">
                     <small class="text-muted">
                         Azure: dev.azure.com/org or org.visualstudio.com<br>
-                        GitHub: github.com/org or just org name<br>
-                        GitLab: gitlab.com/group
+
                     </small>
                 </div>
                 

@@ -1,7 +1,5 @@
 const db = require('../db');
 const AzureDevOpsClient = require('./azure-devops');
-const GitHubClient = require('./github');
-const GitLabClient = require('./gitlab');
 const { isFileExcluded } = require('../utils/file-exclusions');
 const { processIdentities } = require('./developer-grouping');
 const { analyzeCommit, saveCommitFlags } = require('./analysis');
@@ -44,17 +42,14 @@ async function runWithConcurrency(items, concurrency, asyncFn) {
 /**
  * Get client for a platform
  */
+/**
+ * Get client for a platform
+ */
 function getClientForPlatform(platform) {
-    switch (platform.type) {
-        case 'azure_devops':
-            return new AzureDevOpsClient(platform.url, platform.token, platform.username);
-        case 'github':
-            return new GitHubClient(platform.url, platform.token);
-        case 'gitlab':
-            return new GitLabClient(platform.url, platform.token);
-        default:
-            throw new Error(`Unknown platform type: ${platform.type}`);
+    if (platform.type === 'azure_devops') {
+        return new AzureDevOpsClient(platform.url, platform.token, platform.username);
     }
+    throw new Error(`Unknown platform type: ${platform.type}`);
 }
 
 /**
